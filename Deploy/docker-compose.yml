@@ -1,0 +1,58 @@
+services:
+  app_db:
+    hostname: app_db
+    container_name: app_db
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ExceptionJournal
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      
+  migrations:
+    container_name: app_migrations
+    build:
+      context: ../
+      dockerfile: ./Database.RuntimeJournal/Dockerfile
+    depends_on:
+      app_db:
+        condition: service_healthy
+    environment:
+      Database__Postgres__Host: app_db
+      Database__Postgres__Port: 5432
+      Database__Postgres__User: "postgres"
+      Database__Postgres__Password: "postgres"
+      Database__Postgres__DbName: "ExceptionJournal"
+      
+  journal_api_v1:
+    container_name: app_journal_api_v1
+    build:
+      context: ../
+      dockerfile: ./Application.Userspaces.RuntimeJournalApi/Dockerfile
+    ports:
+      - "25500:8080"
+    depends_on:
+      app_db:
+        condition: service_healthy
+    environment:
+      Database__Postgres__Host: app_db
+      Database__Postgres__Port: 5432
+      Database__Postgres__User: "postgres"
+      Database__Postgres__Password: "postgres"
+      Database__Postgres__DbName: "ExceptionJournal"
+      Serilog:MinimumLevel:Default: "Debug"
+      Serilog:MinimumLevel:Override:Microsoft: "Debug"
+      Serilog:MinimumLevel:Override:System: "Debug"
+
+volumes:
+  db_data:
+    driver: local
